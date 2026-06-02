@@ -28,7 +28,34 @@ function ChangeView({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, map.getZoom());
+    map.invalidateSize();
   }, [center, map]);
+  return null;
+}
+
+function MapAutoInvalidate() {
+  const map = useMap();
+  useEffect(() => {
+    // Immediate invalidate
+    map.invalidateSize();
+    
+    // Staggered invalidations to handle animations & modal transitions
+    const timers = [50, 150, 300, 600, 1000].map(delay => 
+      setTimeout(() => {
+        map.invalidateSize();
+      }, delay)
+    );
+
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [map]);
   return null;
 }
 
@@ -41,7 +68,7 @@ export default function MapComponent({ resources, onMarkerClick }: MapComponentP
   const center = mapPoints.length > 0 ? mapPoints[0].coords : defaultCenter;
 
   return (
-    <div className="h-full w-full rounded-2xl overflow-hidden border border-slate-200 shadow-xl relative">
+    <div className="absolute inset-0 w-full h-full rounded-2xl overflow-hidden border border-slate-100 shadow-xl">
       <MapContainer 
         center={center} 
         zoom={11} 
@@ -53,6 +80,7 @@ export default function MapComponent({ resources, onMarkerClick }: MapComponentP
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
         <ChangeView center={center} />
+        <MapAutoInvalidate />
         {mapPoints.map((point) => (
           <Marker 
             key={point.id} 

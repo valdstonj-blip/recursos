@@ -2035,7 +2035,7 @@ export default function App() {
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col lg:flex-row gap-6 md:gap-8 custom-scrollbar">
                   
                   {/* Details list (matches Image 4 layout fields perfectly) */}
-                  <div className="w-full lg:max-w-md xl:max-w-lg shrink-0 space-y-5 md:space-y-6">
+                  <div className="w-full lg:max-w-md xl:max-w-lg shrink-0 space-y-5 md:space-y-6 order-last lg:order-none">
                     
                     {/* Unidade Apoiada badge header */}
                     <div className="bg-[#f0f9ff]/70 border border-sky-100 p-4.5 rounded-[1.5rem] shadow-2xs">
@@ -2196,7 +2196,7 @@ export default function App() {
                   </div>
 
                   {/* Right Interactive Map component */}
-                  <div className="flex-1 min-h-[260px] lg:h-auto rounded-2xl md:rounded-3xl overflow-hidden border border-slate-200/80 shadow-inner flex flex-col">
+                  <div className="flex-1 min-h-[300px] h-[320px] sm:h-[400px] lg:h-auto rounded-2xl md:rounded-3xl overflow-hidden border border-slate-200/80 shadow-inner flex flex-col order-first lg:order-none">
                     <div className="bg-slate-50 border-b border-slate-100 p-3 flex items-center justify-between shrink-0">
                       <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-[#38BDF8]" /> Visualização de Inteligência Territorial SGO
