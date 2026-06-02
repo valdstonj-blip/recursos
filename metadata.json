@@ -1,0 +1,8 @@
+{
+  "name": "SGO - Planejamento Operacional",
+  "description": "Relatório Técnico de Planejamento Operacional para Autoridades Superiores (SEPM/PMERJ)",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
