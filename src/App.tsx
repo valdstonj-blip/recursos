@@ -23,7 +23,8 @@ import {
   FileDown,
   ChevronDown,
   Sun,
-  AlertTriangle
+  AlertTriangle,
+  ArrowUpDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -63,6 +64,27 @@ function normalizeStatus(raw: string): string {
     return "FINALIZADO";
   }
   return raw || "EM ANDAMENTO";
+}
+
+function parseStartDate(dataTurno: string): number {
+  const dateRegex = /(\d{2})\/(\d{2})\/(\d{4})/;
+  const match = (dataTurno || "").match(dateRegex);
+  if (match) {
+    const [_, day, month, year] = match;
+    const timeRegex = /(\d{2}):(\d{2})/;
+    const timeMatch = (dataTurno || "").match(timeRegex);
+    let hours = 0;
+    let minutes = 0;
+    if (timeMatch) {
+      hours = Number(timeMatch[1]);
+      minutes = Number(timeMatch[2]);
+    }
+    const d = new Date(Number(year), Number(month) - 1, Number(day), hours, minutes);
+    if (!isNaN(d.getTime())) {
+      return d.getTime();
+    }
+  }
+  return 0;
 }
 
 function getDatesAndTimes(dataTurno: string, isWeekend: boolean) {
@@ -278,6 +300,8 @@ export default function App() {
   });
   const [weekendFilter, setWeekendFilter] = useState<string>("TODOS"); // "TODOS" | "SIM" | "NÃO"
   const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<string>("DATA_INICIO_ASC"); // Default to chronological sorting
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [activeAlertIndex, setActiveAlertIndex] = useState(0);
   
   // Custom Toasts for Action confirmation
@@ -728,12 +752,13 @@ export default function App() {
 
   // Handle PDF report generation / print view
   const triggerPrintReport = () => {
-    generatePDF(filteredResources, lastUpdated);
+    const title = activePage === "gre_recom" ? "CONTROLE GRE/RECOM" : "LOCALIZAÇÃO DE RECURSOS";
+    generatePDF(filteredResources, lastUpdated, title);
   };
 
   // Filter logic based on user inputs
   const filteredResources = useMemo(() => {
-    return resources.filter(res => {
+    const filtered = resources.filter(res => {
       // Search Box filter
       const q = searchQuery.toLowerCase();
       const matchesSearch = q === "" || 
@@ -748,8 +773,15 @@ export default function App() {
         res.unidadeApoiada.toLowerCase().includes(selectedUnit.toLowerCase());
 
       // Situation/Status Filter Button
-      const matchesStatus = statusFilter === "TODOS" || 
-        normalizeStatus(res.status) === normalizeStatus(statusFilter);
+      let matchesStatus = false;
+      if (statusFilter === "TODOS") {
+        matchesStatus = true;
+      } else if (statusFilter === "EM_ANDAMENTO_PROGRAMADO") {
+        const norm = normalizeStatus(res.status);
+        matchesStatus = norm === "EM ANDAMENTO" || norm === "PROGRAMADO";
+      } else {
+        matchesStatus = normalizeStatus(res.status) === normalizeStatus(statusFilter);
+      }
 
       // Weekend Filter Button
       let matchesWeekend = true;
@@ -761,7 +793,16 @@ export default function App() {
 
       return matchesSearch && matchesUnit && matchesStatus && matchesWeekend;
     });
-  }, [resources, searchQuery, selectedUnit, statusFilter, weekendFilter]);
+
+    // Apply sorting
+    if (sortBy === "DATA_INICIO_ASC") {
+      filtered.sort((a, b) => parseStartDate(a.dataTurno) - parseStartDate(b.dataTurno));
+    } else if (sortBy === "DATA_INICIO_DESC") {
+      filtered.sort((a, b) => parseStartDate(b.dataTurno) - parseStartDate(a.dataTurno));
+    }
+
+    return filtered;
+  }, [resources, searchQuery, selectedUnit, statusFilter, weekendFilter, sortBy]);
 
   // Aggregate stats based on current filtered view for the Colonel cards
   const totalEquipes = useMemo(() => {
@@ -1371,22 +1412,26 @@ export default function App() {
                   <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 ${
                     statusFilter === "TODOS"
                       ? "bg-[#0F172A]/5 text-[#0F172A] border-[#0F172A]/10"
-                      : statusFilter === "EM ANDAMENTO"
-                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/50"
-                        : statusFilter === "PROGRAMADO"
-                          ? "bg-blue-50 text-blue-600 border-blue-200/50"
-                          : "bg-slate-50 text-slate-600 border-slate-200/50"
+                      : statusFilter === "EM_ANDAMENTO_PROGRAMADO"
+                        ? "bg-amber-50 text-amber-600 border-amber-200/50"
+                        : statusFilter === "EM ANDAMENTO"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-200/50"
+                          : statusFilter === "PROGRAMADO"
+                            ? "bg-blue-50 text-blue-600 border-blue-200/50"
+                            : "bg-slate-50 text-slate-600 border-slate-200/50"
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${
                       statusFilter === "TODOS"
                         ? "bg-[#38BDF8]"
-                        : statusFilter === "EM ANDAMENTO"
-                          ? "bg-[#00c27e] animate-pulse"
-                          : statusFilter === "PROGRAMADO"
-                            ? "bg-[#3B82F6]"
-                            : "bg-[#64748B]"
+                        : statusFilter === "EM_ANDAMENTO_PROGRAMADO"
+                          ? "bg-[#FF9800]"
+                          : statusFilter === "EM ANDAMENTO"
+                            ? "bg-[#00c27e] animate-pulse"
+                            : statusFilter === "PROGRAMADO"
+                              ? "bg-[#3B82F6]"
+                              : "bg-[#64748B]"
                     }`} />
-                    {statusFilter === "TODOS" ? "TODOS OS STATUS" : statusFilter}
+                    {statusFilter === "EM_ANDAMENTO_PROGRAMADO" ? "EM ANDAMENTO + PROGRAMADO" : (statusFilter === "TODOS" ? "TODOS OS STATUS" : statusFilter)}
                   </span>
                   {statusFilter === "TODOS" && (
                     <span className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">
@@ -1502,22 +1547,26 @@ export default function App() {
                   <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 ${
                     statusFilter === "TODOS"
                       ? "bg-[#0F172A]/5 text-[#0F172A] border-[#0F172A]/10"
-                      : statusFilter === "EM ANDAMENTO"
-                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/50"
-                        : statusFilter === "PROGRAMADO"
-                          ? "bg-blue-50 text-blue-600 border-blue-200/50"
-                          : "bg-slate-50 text-slate-600 border-slate-200/50"
+                      : statusFilter === "EM_ANDAMENTO_PROGRAMADO"
+                        ? "bg-amber-50 text-amber-600 border-amber-200/50"
+                        : statusFilter === "EM ANDAMENTO"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-200/50"
+                          : statusFilter === "PROGRAMADO"
+                            ? "bg-blue-50 text-blue-600 border-blue-200/50"
+                            : "bg-slate-50 text-slate-600 border-slate-200/50"
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${
                       statusFilter === "TODOS"
                         ? "bg-[#38BDF8]"
-                        : statusFilter === "EM ANDAMENTO"
-                          ? "bg-[#00c27e] animate-pulse"
-                          : statusFilter === "PROGRAMADO"
-                            ? "bg-[#3B82F6]"
-                            : "bg-[#64748B]"
+                        : statusFilter === "EM_ANDAMENTO_PROGRAMADO"
+                          ? "bg-[#FF9800]"
+                          : statusFilter === "EM ANDAMENTO"
+                            ? "bg-[#00c27e] animate-pulse"
+                            : statusFilter === "PROGRAMADO"
+                              ? "bg-[#3B82F6]"
+                              : "bg-[#64748B]"
                     }`} />
-                    {statusFilter === "TODOS" ? "TODOS OS STATUS" : statusFilter}
+                    {statusFilter === "EM_ANDAMENTO_PROGRAMADO" ? "EM ANDAMENTO + PROGRAMADO" : (statusFilter === "TODOS" ? "TODOS OS STATUS" : statusFilter)}
                   </span>
                   {statusFilter === "TODOS" && (
                     <span className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">
@@ -1674,7 +1723,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-1">
               
               {/* Search text input */}
-              <div className="relative md:col-span-7">
+              <div className="relative md:col-span-5">
                 <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                 <input 
                   type="text"
@@ -1694,7 +1743,7 @@ export default function App() {
               </div>
 
               {/* Supported Unit dropdown selector */}
-              <div className="relative md:col-span-5">
+              <div className="relative md:col-span-4">
                 <button
                   onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)}
                   className="w-full bg-white hover:bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-left text-xs font-extrabold text-[#0F172A] flex items-center justify-between transition-colors shadow-xs"
@@ -1731,6 +1780,52 @@ export default function App() {
                 )}
               </div>
 
+              {/* Sorting selector */}
+              <div className="relative md:col-span-3">
+                <button
+                  onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                  className="w-full bg-white hover:bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-left text-xs font-extrabold text-[#0F172A] flex items-center justify-between transition-colors shadow-xs"
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <ArrowUpDown className="w-3.5 h-3.5 text-[#38BDF8]" />
+                    {sortBy === "PADRAO" 
+                      ? "ORDEM ORIGINAL" 
+                      : sortBy === "DATA_INICIO_ASC" 
+                        ? "DATA DE INÍCIO (CRESC.)" 
+                        : "DATA DE INÍCIO (DECRESC.)"}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                </button>
+
+                {isSortDropdownOpen && (
+                  <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                    <div className="p-1.5 grid grid-cols-1 gap-0.5">
+                      {[
+                        { key: "PADRAO", label: "ORDEM ORIGINAL" },
+                        { key: "DATA_INICIO_ASC", label: "DATA DE INÍCIO (CRESC.)" },
+                        { key: "DATA_INICIO_DESC", label: "DATA DE INÍCIO (DECRESC.)" }
+                      ].map(item => (
+                        <button
+                          key={item.key}
+                          onClick={() => {
+                            setSortBy(item.key);
+                            setIsSortDropdownOpen(false);
+                          }}
+                          className={`text-left px-3.5 py-2 rounded-lg text-xs font-bold uppercase transition-colors flex items-center justify-between ${
+                            sortBy === item.key 
+                              ? "bg-[#0F172A] text-[#38BDF8]" 
+                              : "hover:bg-slate-50 text-slate-650"
+                          }`}
+                        >
+                          <span>{item.label}</span>
+                          {sortBy === item.key && <CheckCircle2 className="w-3.5 h-3.5 text-[#38BDF8]" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
 
             {/* Bottom row of Table header: Quick switch situation + weekend */}
@@ -1740,13 +1835,15 @@ export default function App() {
               <div className="flex-1 w-full md:w-auto">
                 <span className="text-[8px] font-black uppercase tracking-widest text-[#0F172A] block mb-1.5 font-sans">Status</span>
                 <div className="flex bg-slate-100/80 border border-slate-200/60 p-1 rounded-xl gap-1 shadow-xs overflow-x-auto custom-scrollbar">
-                  {["TODOS", "EM ANDAMENTO", "PROGRAMADO", "FINALIZADO"].map(st => {
+                  {["TODOS", "EM_ANDAMENTO_PROGRAMADO", "EM ANDAMENTO", "PROGRAMADO", "FINALIZADO"].map(st => {
                     const isSelected = statusFilter === st;
                     let activeStyles = "";
                     
                     if (isSelected) {
                       if (st === "TODOS") {
                         activeStyles = "bg-[#0F172A] text-white shadow-[0_2px_8px_rgba(15,23,42,0.25)] border-[#38BDF8]/40 ring-1 ring-[#38BDF8]/30 font-extrabold";
+                      } else if (st === "EM_ANDAMENTO_PROGRAMADO") {
+                        activeStyles = "bg-[#D97706] text-white shadow-[0_2px_12px_rgba(217,119,6,0.4)] border-amber-500/25 font-extrabold";
                       } else if (st === "EM ANDAMENTO") {
                         activeStyles = "bg-[#00c27e] text-white shadow-[0_2px_12px_rgba(0,194,126,0.4)] border-emerald-400/30 font-extrabold";
                       } else if (st === "PROGRAMADO") {
@@ -1764,7 +1861,7 @@ export default function App() {
                         onClick={() => setStatusFilter(st)}
                         className={`px-3 py-1.5 rounded-lg text-[9px] uppercase font-black tracking-wider transition-all duration-300 whitespace-nowrap flex-1 text-center border cursor-pointer active:scale-[0.96] ${activeStyles}`}
                       >
-                        {st}
+                        {st === "EM_ANDAMENTO_PROGRAMADO" ? "ANDAMENTO + PROGRAMADO" : st}
                       </button>
                     );
                   })}

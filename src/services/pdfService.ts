@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { GreResource } from "../types";
 
-export function generatePDF(resources: GreResource[], lastUpdated: string) {
+export function generatePDF(resources: GreResource[], lastUpdated: string, reportTitle = "LOCALIZAÇÃO DE RECURSOS") {
   // Create jsPDF instance (A4 size, portrait, mm)
   const doc = new jsPDF({
     orientation: "portrait",
@@ -32,7 +32,7 @@ export function generatePDF(resources: GreResource[], lastUpdated: string) {
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("LOCALIZAÇÃO DE RECURSOS", 14, 18);
+    doc.text(reportTitle, 14, 18);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
@@ -178,6 +178,10 @@ export function generatePDF(resources: GreResource[], lastUpdated: string) {
   }
 
   // Open PDF download or print view
-  const pdfName = `relatorio-sgo-pmerj-${new Date().toISOString().slice(0, 10)}.pdf`;
+  const formattedTitle = reportTitle.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-z0-9]+/g, "-"); // replace space, slash with dash
+  
+  const pdfName = `relatorio-${formattedTitle}-${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(pdfName);
 }
